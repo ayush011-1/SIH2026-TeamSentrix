@@ -1,0 +1,14 @@
+# Core Deep Learning & PyTorch
+torch>=2.1.0
+torchvision>=0.16.0
+pytorch-lightning>=2.0.0
+
+# RF-DETR model and training extras
+rfdetr[train,loggers]>=1.11.0
+
+# Computer Vision & Utilities
+opencv-python>=4.8.0
+supervision>=0.20.0
+transformers>=4.40.0
+pydantic>=2.0.0
+tqdm>=4.65.0
