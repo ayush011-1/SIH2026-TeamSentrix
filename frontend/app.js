@@ -189,6 +189,13 @@ document.addEventListener('DOMContentLoaded', () => {
         state.currentImageFile = null;
         state.currentSamplePath = sample.path;
 
+        // Auto-select model type based on sample
+        if (sample.name.toLowerCase().includes('bus')) {
+            imageModelSelect.value = 'coco';
+        } else if (sample.name.toLowerCase().includes('pothole')) {
+            imageModelSelect.value = 'pothole';
+        }
+
         imageSourcePreview.src = sample.url;
         imageSourcePreview.onload = () => {
             imageResolutionBadge.textContent = `${imageSourcePreview.naturalWidth} × ${imageSourcePreview.naturalHeight}`;
@@ -334,11 +341,15 @@ document.addEventListener('DOMContentLoaded', () => {
         detectionsTableBody.innerHTML = '';
 
         if (!data.detections || data.detections.length === 0) {
+            const hint = data.model_used === 'pothole'
+                ? '<br><span style="color: var(--accent-cyan); margin-top: 6px; display: inline-block;">💡 Tip: Looking for buses, cars, or people? The Pothole model only searches for potholes. Switch the Model Engine dropdown above to <strong>COCO General Model</strong>.</span>'
+                : '<br><span class="text-muted">Try lowering the confidence threshold slider above.</span>';
+
             detectionsTableBody.innerHTML = `
                 <tr>
                     <td colspan="5" class="table-empty">
-                        No objects detected at confidence threshold ≥ ${imageThresholdSlider.value}.
-                        Try lowering the threshold slider above.
+                        No ${data.model_used === 'pothole' ? 'potholes' : 'objects'} detected at confidence threshold ≥ ${imageThresholdSlider.value}.
+                        ${hint}
                     </td>
                 </tr>
             `;
