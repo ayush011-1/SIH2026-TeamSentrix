@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Model weights and checkpoints (exceed GitHub's 100MB file limit)
+*.ckpt
+*.pth
+*.pt
+*.bin
+*.onnx
+
+# TensorBoard logs
+*.tfevents.*
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE / Editor files
+.vscode/
+.idea/
