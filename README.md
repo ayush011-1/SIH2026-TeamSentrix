@@ -1,7 +1,7 @@
 # Sentrix: AI-Powered Road Hazard & Pothole Detection
 > Smart India Hackathon (SIH 2026) | Team Sentrix
 
-Real-time, transformer-based road hazard and pothole detection powered by **RF-DETR (Real-time Vision Transformer Object Detector)**.
+Real-time, transformer-based road hazard and pothole detection powered by **RF-DETR (Real-time Vision Transformer Object Detector)** with a built-in interactive web testing console.
 
 ---
 
@@ -9,10 +9,12 @@ Real-time, transformer-based road hazard and pothole detection powered by **RF-D
 - [Overview](#overview)
 - [Project Structure](#project-structure)
 - [Installation & Setup](#installation--setup)
+- [Interactive Web Testing Dashboard](#interactive-web-testing-dashboard)
 - [Dataset](#dataset)
 - [Model Training](#model-training)
+- [Multi-Hazard Extension (Accidents, Waterlogging, ANPR)](#multi-hazard-extension-accidents-waterlogging-anpr)
 - [Model Weights & Checkpoints](#model-weights--checkpoints)
-- [Running Inference](#running-inference)
+- [Running CLI Inference](#running-cli-inference)
   - [Image Detection](#image-detection)
   - [Video Detection](#video-detection)
   - [General Object Detection](#general-object-detection)
@@ -26,32 +28,33 @@ Sentrix utilizes RF-DETR-Small (DINOv2 backbone) fine-tuned on the Transiteye po
 Key highlights:
 - **State-of-the-Art Architecture**: End-to-end DETR transformer without post-processing NMS bottlenecks.
 - **Hardware Acceleration**: Out-of-the-box support for Apple Silicon (`mps`), NVIDIA CUDA (`cuda`), and CPU.
-- **Configurable Pipeline**: Flexible scripts for training, single-image inference, and streaming video analysis.
+- **Interactive Web Console**: Sleek dark-mode testing interface with drag-and-drop, sample selectors, live telemetry (latency & FPS), and detections inspection.
+- **Multi-Hazard Capable**: Readily extensible to Accidents, Waterlogging, and License Plate Recognition (ANPR).
 
 ---
 
 ## Project Structure
 ```text
 SIH2026-TeamSentrix/
+├── app.py                           # Root launcher for Web Testing Console
 ├── ai/
+│   ├── server.py                    # FastAPI backend with model caching
 │   ├── train.py                     # Training entrypoint for RF-DETR
 │   └── inference/
-│       ├── test_pothole.py          # Image inference with pothole model
-│       ├── video_pothole.py         # Video inference with frame sampling
+│       ├── test_pothole.py          # CLI image inference with pothole model
+│       ├── video_pothole.py         # CLI video inference with frame sampling
 │       └── detect.py                # Pre-trained baseline inference
+├── frontend/                        # Web Testing Dashboard UI
+│   ├── index.html                   # Modern glassmorphic console
+│   ├── styles.css                   # Custom dark design system
+│   └── app.js                       # Asynchronous dashboard logic
 ├── datasets/
 │   └── transiteye/                  # Roboflow pothole dataset (train, valid, test)
-│       ├── classes.txt
-│       ├── train/
-│       ├── valid/
-│       └── test/
 ├── output/
 │   └── pothole_rfdetr_s/            # Checkpoints, logs, and metrics
-│       ├── checkpoint_best_total.pth (ignored in git due to file size)
-│       └── metrics.csv
 ├── outputs/                         # Annotated outputs (images & videos)
 ├── test_custom/                     # Sample test images
-├── test_videos/                     # Sample test video
+├── test_videos/                     # Sample test videos
 ├── requirements.txt                 # Python dependencies
 └── README.md
 ```
@@ -85,6 +88,26 @@ pip install -r requirements.txt
 
 ---
 
+## Interactive Web Testing Dashboard
+
+Launch the built-in testing interface to run visual inference on images or videos with confidence sliders, telemetry badges, and detection tables:
+
+```bash
+python app.py
+```
+
+Then open your browser at:
+👉 **`http://localhost:8000`**
+
+### Features:
+- **Image Testing**: Drag and drop any road image or click 1-click sample chips (`pothole.png`, `bus.jpeg`).
+- **Video Testing**: Process road videos (`road.mp4`) with configurable frame skips and preview annotated video directly in the browser.
+- **Model Selector**: Switch between your fine-tuned Pothole model and the base 80-class COCO detector.
+- **Live Telemetry**: Real-time inference latency (ms), FPS, and bounding box inspection table.
+- **Multi-Hazard Hub**: Architecture guide for training on accidents, waterlogging, and ANPR.
+
+---
+
 ## Dataset
 The repository includes the **Transiteye** pothole dataset inside [datasets/transiteye/](datasets/transiteye/).
 It is pre-formatted in Roboflow format with:
@@ -97,7 +120,7 @@ It is pre-formatted in Roboflow format with:
 
 ## Model Training
 
-To train RF-DETR-Small on the pothole dataset from scratch:
+To train RF-DETR-Small on the pothole dataset:
 
 ```bash
 python ai/train.py --epochs 50 --batch-size 4
@@ -137,6 +160,36 @@ Training automatically saves the best weights to:
 
 ---
 
+## Multi-Hazard Extension (Accidents, Waterlogging, ANPR)
+
+Can this model be trained on **Accidents**, **Waterlogging**, and **ANPR**? **Yes, absolutely.**
+
+### 1. Vehicle Accidents & Collisions
+- **Supported natively.** Collisions, overturned vehicles, and roadside debris are standard bounding-box object detection tasks.
+- RF-DETR's transformer attention captures global road context (angled cars, skid marks) better than traditional CNNs.
+- Label classes: `accident`, `overturned_vehicle`, `debris`.
+
+### 2. Waterlogging & Flooded Roads
+- **Bounding Boxes**: Detect puddles and flood zones with standard RF-DETR.
+- **Instance Segmentation**: The same package provides `RFDETRSegSmall`, which predicts exact polygon masks for water pool boundaries and surface area estimation.
+
+### 3. ANPR (Automatic Number Plate Recognition)
+- **Stage 1 (RF-DETR)**: Detects the `license_plate` bounding box in dense traffic at ~30 FPS.
+- **Stage 2 (OCR)**: Crop the detected plate and pass it to a lightweight OCR model (e.g. `PaddleOCR` or `EasyOCR`) to read the registration number (e.g. `MH 12 AB 1234`).
+
+### 4. Unified Multi-Hazard Training
+You can combine all classes into **one single model**:
+```text
+# classes.txt
+pothole
+accident
+waterlogging
+license_plate
+```
+Train with `python ai/train.py --dataset-dir datasets/unified_hazards` and the model will detect all road hazards and vehicle plates simultaneously in real time.
+
+---
+
 ## Model Weights & Checkpoints
 
 > [!NOTE]
@@ -145,41 +198,24 @@ Training automatically saves the best weights to:
 ### How weights are managed:
 1. **Base Pretrained Weights**: RF-DETR downloads the official base model automatically when you run `RFDETRSmall()` for the first time.
 2. **Sharing Fine-Tuned Weights**:
-   - **GitHub Releases**: Download the latest `checkpoint_best_total.pth` from the [GitHub Releases](https://github.com/ayush011-1/SIH2026-TeamSentrix/releases) tab and save it in `output/pothole_rfdetr_s/`.
+   - **GitHub Releases**: Download `checkpoint_best_total.pth` from the [GitHub Releases](https://github.com/ayush011-1/SIH2026-TeamSentrix/releases) tab and save it in `output/pothole_rfdetr_s/`.
    - Or run training locally with `python ai/train.py` to produce your own weights.
 
 ---
 
-## Running Inference
+## Running CLI Inference
 
 ### Image Detection
-Detect potholes in a single image:
 ```bash
 python ai/inference/test_pothole.py --image test_custom/pothole.png --output outputs/pothole_result.jpg
 ```
-**Options:**
-- `--model`: Path to model weights (default: `output/pothole_rfdetr_s/checkpoint_best_total.pth`)
-- `--image`: Input image path
-- `--output`: Output image save path
-- `--threshold`: Confidence threshold (default: `0.65`)
-
----
 
 ### Video Detection
-Process a video and produce a bounding-box annotated video:
 ```bash
 python ai/inference/video_pothole.py --video test_videos/road.mp4 --output outputs/video/road_detected.mp4
 ```
-**Options:**
-- `--video`: Input video file path
-- `--output`: Output annotated video path
-- `--threshold`: Confidence score threshold (default: `0.65`)
-- `--frame-skip`: Skip every N frames for faster processing (default: `2`)
-
----
 
 ### General Object Detection
-Run the base pretrained RF-DETR model (detecting common COCO objects like cars, buses, pedestrians):
 ```bash
 python ai/inference/detect.py
 ```

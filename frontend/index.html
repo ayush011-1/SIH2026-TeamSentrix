@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentrix AI | Road Hazard & Pothole Model Testing Platform</title>
+    <meta name="description" content="Real-time web testing dashboard for RF-DETR road hazard and pothole detection models.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <!-- Background Ambient Glows -->
+    <div class="glow-orb glow-top-left"></div>
+    <div class="glow-orb glow-bottom-right"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="navbar">
+            <div class="nav-brand">
+                <div class="brand-badge">
+                    <span class="pulse-dot"></span>
+                    <span class="brand-name">SENTRIX</span>
+                    <span class="brand-tag">SIH 2026</span>
+                </div>
+                <h1 class="nav-title">RF-DETR Model Testing Console</h1>
+            </div>
+
+            <div class="nav-status">
+                <div class="status-chip" id="deviceStatusChip">
+                    <span class="chip-icon">⚡</span>
+                    <span id="deviceText">Detecting Hardware...</span>
+                </div>
+                <div class="status-chip" id="modelStatusChip">
+                    <span class="chip-icon">🧠</span>
+                    <span id="modelStatusText">Checking Model...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs" role="tablist">
+            <button class="tab-btn active" id="tabImageBtn" data-tab="imageTab" role="tab" aria-selected="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                Image Testing
+            </button>
+            <button class="tab-btn" id="tabVideoBtn" data-tab="videoTab" role="tab" aria-selected="false">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                Video Testing
+            </button>
+            <button class="tab-btn" id="tabArchitectureBtn" data-tab="architectureTab" role="tab" aria-selected="false">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Multi-Hazard Hub (Accidents, ANPR, Water)
+            </button>
+        </nav>
+
+        <!-- TAB 1: IMAGE TESTING -->
+        <main class="tab-pane active" id="imageTab">
+            <!-- Controls Bar -->
+            <section class="control-panel glass-card">
+                <div class="control-group">
+                    <label for="imageModelSelect" class="control-label">Model Engine</label>
+                    <div class="select-wrapper">
+                        <select id="imageModelSelect" class="styled-select">
+                            <option value="pothole">Pothole Model (Trained RF-DETR-S)</option>
+                            <option value="coco">COCO General Model (80 Base Classes)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-group slider-group">
+                    <div class="slider-header">
+                        <label for="imageThresholdSlider" class="control-label">Confidence Threshold</label>
+                        <span class="slider-value" id="imageThresholdVal">0.50</span>
+                    </div>
+                    <input type="range" id="imageThresholdSlider" min="0.10" max="0.95" step="0.05" value="0.50" class="styled-slider">
+                </div>
+
+                <div class="control-group button-group">
+                    <button id="runImageDetectBtn" class="btn btn-primary glow-btn">
+                        <span class="btn-spinner hidden" id="imageSpinner"></span>
+                        <span class="btn-icon">⚡</span>
+                        <span class="btn-text">Run Inference</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Quick Test Samples -->
+            <section class="samples-panel glass-card">
+                <div class="section-title-sm">
+                    <span>⚡ Quick Test Samples</span>
+                    <span class="text-muted">Click to instantly load & test</span>
+                </div>
+                <div class="samples-grid" id="imageSamplesGrid">
+                    <div class="sample-skeleton">Loading samples...</div>
+                </div>
+            </section>
+
+            <!-- Workspace: Upload & Results -->
+            <div class="workspace-grid">
+                <!-- Upload Dropzone -->
+                <section class="dropzone-card glass-card">
+                    <div class="card-header">
+                        <h3>Input Image</h3>
+                        <span class="badge" id="imageResolutionBadge">No Image</span>
+                    </div>
+                    <div class="dropzone" id="imageDropzone">
+                        <input type="file" id="imageFileInput" accept="image/*" class="file-input-hidden">
+                        <div class="dropzone-content" id="dropzoneEmpty">
+                            <div class="upload-icon-circle">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            </div>
+                            <p class="dropzone-main-text">Drag & drop road image here</p>
+                            <p class="dropzone-sub-text">or <span class="text-highlight">browse from disk</span> (JPG, PNG)</p>
+                        </div>
+                        <div class="preview-wrapper hidden" id="imagePreviewWrapper">
+                            <img id="imageSourcePreview" class="preview-img" alt="Source Preview">
+                            <button id="removeImageBtn" class="btn-icon-floating" title="Remove image">&times;</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Annotated Output -->
+                <section class="results-card glass-card">
+                    <div class="card-header">
+                        <h3>Detection Output</h3>
+                        <div class="telemetry-badges" id="telemetryBadges">
+                            <span class="metric-pill" id="latencyPill">-- ms</span>
+                            <span class="metric-pill" id="fpsPill">-- FPS</span>
+                            <span class="metric-pill pill-accent" id="countPill">0 Detections</span>
+                        </div>
+                    </div>
+
+                    <div class="result-display-area" id="imageResultArea">
+                        <div class="placeholder-state" id="imageResultPlaceholder">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            <p>Upload or pick a sample image and click <strong>Run Inference</strong></p>
+                        </div>
+                        <div class="annotated-image-wrapper hidden" id="annotatedImageWrapper">
+                            <img id="imageAnnotatedResult" class="preview-img" alt="AI Detection Result">
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Detection Breakdown Table -->
+            <section class="breakdown-card glass-card">
+                <div class="card-header">
+                    <h3>Detections Inspector</h3>
+                    <span class="text-muted" id="detectionsSummaryText">Awaiting inference...</span>
+                </div>
+                <div class="table-container">
+                    <table class="styled-table" id="detectionsTable">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Class</th>
+                                <th>Confidence</th>
+                                <th>Bounding Box (X1, Y1, X2, Y2)</th>
+                                <th>Dimensions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detectionsTableBody">
+                            <tr>
+                                <td colspan="5" class="table-empty">No detections to display yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <!-- TAB 2: VIDEO TESTING -->
+        <main class="tab-pane" id="videoTab">
+            <section class="control-panel glass-card">
+                <div class="control-group">
+                    <label for="videoModelSelect" class="control-label">Model Engine</label>
+                    <div class="select-wrapper">
+                        <select id="videoModelSelect" class="styled-select">
+                            <option value="pothole">Pothole Model (Trained RF-DETR-S)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-group slider-group">
+                    <div class="slider-header">
+                        <label for="videoThresholdSlider" class="control-label">Confidence</label>
+                        <span class="slider-value" id="videoThresholdVal">0.65</span>
+                    </div>
+                    <input type="range" id="videoThresholdSlider" min="0.20" max="0.95" step="0.05" value="0.65" class="styled-slider">
+                </div>
+
+                <div class="control-group slider-group">
+                    <div class="slider-header">
+                        <label for="frameSkipSlider" class="control-label">Frame Sampling</label>
+                        <span class="slider-value" id="frameSkipVal">Every 2nd</span>
+                    </div>
+                    <input type="range" id="frameSkipSlider" min="1" max="5" step="1" value="2" class="styled-slider">
+                </div>
+
+                <div class="control-group button-group">
+                    <button id="runVideoDetectBtn" class="btn btn-primary glow-btn">
+                        <span class="btn-spinner hidden" id="videoSpinner"></span>
+                        <span class="btn-icon">🎬</span>
+                        <span class="btn-text">Process Video</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Video Quick Samples -->
+            <section class="samples-panel glass-card">
+                <div class="section-title-sm">
+                    <span>⚡ Sample Road Videos</span>
+                    <span class="text-muted">Click to select test video</span>
+                </div>
+                <div class="samples-grid" id="videoSamplesGrid">
+                    <div class="sample-skeleton">Loading sample videos...</div>
+                </div>
+            </section>
+
+            <!-- Video Workspace -->
+            <div class="workspace-grid">
+                <!-- Source Video -->
+                <section class="dropzone-card glass-card">
+                    <div class="card-header">
+                        <h3>Source Video</h3>
+                        <span class="badge" id="videoDurationBadge">Ready</span>
+                    </div>
+                    <div class="video-preview-wrapper" id="sourceVideoWrapper">
+                        <video id="sourceVideoPlayer" controls playsinline class="media-player">
+                            <source src="/samples/test_videos/road.mp4" type="video/mp4">
+                            Your browser does not support video playback.
+                        </video>
+                    </div>
+                </section>
+
+                <!-- Processed Video -->
+                <section class="results-card glass-card">
+                    <div class="card-header">
+                        <h3>AI Detected Video</h3>
+                        <div class="telemetry-badges" id="videoTelemetry">
+                            <span class="metric-pill" id="videoFpsPill">-- FPS</span>
+                            <span class="metric-pill pill-accent" id="videoDetectionsPill">-- Potholes</span>
+                        </div>
+                    </div>
+                    <div class="video-preview-wrapper" id="detectedVideoWrapper">
+                        <div class="placeholder-state" id="videoPlaceholder">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                            <p>Select video and click <strong>Process Video</strong></p>
+                        </div>
+                        <video id="detectedVideoPlayer" controls playsinline class="media-player hidden">
+                            <source id="detectedVideoSource" src="" type="video/mp4">
+                        </video>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- TAB 3: MULTI-HAZARD HUB (Accidents, ANPR, Waterlogging) -->
+        <main class="tab-pane" id="architectureTab">
+            <section class="hub-hero glass-card">
+                <div class="hero-content">
+                    <div class="hero-badge">Deep Technical Architecture</div>
+                    <h2>Can RF-DETR Learn Accidents, ANPR & Waterlogging?</h2>
+                    <p class="hero-subtitle">
+                        <strong>Yes, absolutely.</strong> RF-DETR uses a DINOv2 vision transformer backbone and can detect multiple hazard classes simultaneously in a single real-time forward pass.
+                    </p>
+                </div>
+            </section>
+
+            <div class="hub-grid">
+                <!-- Card 1: Accidents -->
+                <div class="hub-card glass-card">
+                    <div class="card-tag tag-accident">💥 Hazard Detection</div>
+                    <h3>Vehicle Accidents & Crashes</h3>
+                    <p class="card-desc">
+                        Detecting collisions, overturned vehicles, and hazardous roadside debris.
+                    </p>
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Native Bounding Boxes:</strong> Identifies crumpled metal, overturned trucks, and multiple-car pileups.</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Attention Advantage:</strong> Vision Transformers capture global context (skid marks, vehicle angles) better than CNNs.</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Class Labels:</strong> <code>accident</code>, <code>overturned</code>, <code>debris</code></span>
+                        </div>
+                    </div>
+                    <div class="hub-code">
+                        <code>classes = ["pothole", "accident", "debris"]</code>
+                    </div>
+                </div>
+
+                <!-- Card 2: Waterlogging -->
+                <div class="hub-card glass-card">
+                    <div class="card-tag tag-water">🌊 Road Condition</div>
+                    <h3>Waterlogging & Flood Patches</h3>
+                    <p class="card-desc">
+                        Detecting submerged road patches, deep puddles, and drainage overflow.
+                    </p>
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Approach 1 (Boxes):</strong> Quick bounding box alerts for shallow/deep puddles.</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Approach 2 (Segmentation):</strong> Use <code>RFDETRSegSmall</code> to segment exact water pool contours and surface area!</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Severity Estimator:</strong> Calculate road surface water percentage dynamically.</span>
+                        </div>
+                    </div>
+                    <div class="hub-code">
+                        <code>from rfdetr import RFDETRSegSmall  # For puddle masks</code>
+                    </div>
+                </div>
+
+                <!-- Card 3: ANPR -->
+                <div class="hub-card glass-card">
+                    <div class="card-tag tag-anpr">🚗 Smart Traffic</div>
+                    <h3>Automatic Number Plate Recognition</h3>
+                    <p class="card-desc">
+                        Localizing vehicle license plates and reading registration numbers.
+                    </p>
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Stage 1 (RF-DETR):</strong> High-speed bounding box localization of <code>license_plate</code> in complex traffic.</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Stage 2 (OCR Engine):</strong> Crop plate and extract alphanumeric string using PaddleOCR or EasyOCR.</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-check">✓</span>
+                            <span><strong>Real-time Speed:</strong> RF-DETR (~30ms) + Fast OCR (~15ms) = 45ms end-to-end ANPR!</span>
+                        </div>
+                    </div>
+                    <div class="hub-code">
+                        <code>plate_box = model.predict(frame) -> ocr(crop)</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Unified Multi-Task Recipe -->
+            <section class="recipe-card glass-card">
+                <h3>🚀 The Unified Multi-Hazard Training Recipe</h3>
+                <p>You do not need 4 separate models! You can train <strong>one single unified RF-DETR model</strong> that detects all road hazards at 30+ FPS:</p>
+                
+                <div class="code-block">
+                    <pre><span class="code-comment"># In your dataset's classes.txt:</span>
+pothole
+accident
+waterlogging
+license_plate
+
+<span class="code-comment"># Then train with the included ai/train.py:</span>
+python ai/train.py \
+    --dataset-dir datasets/unified_hazards \
+    --output-dir output/sentrix_unified_s \
+    --epochs 60 \
+    --batch-size 4 \
+    --device auto</pre>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Sentrix AI • Smart India Hackathon 2026 • Powered by RF-DETR & DINOv2</p>
+        </footer>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
