@@ -5,6 +5,7 @@ Team Sentrix - SIH 2026
 
 import base64
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -18,6 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from ai.inference.tracker import IoUTracker
+
 # Try importing RF-DETR
 try:
     from rfdetr import RFDETRSmall
@@ -26,6 +29,8 @@ except ImportError:
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 POTHOLE_MODEL_PATH = BASE_DIR / "output" / "pothole_rfdetr_s" / "checkpoint_best_total.pth"
+INCIDENT_MODEL_PATH = BASE_DIR / "output" / "incident_rfdetr_s" / "checkpoint_best_total.pth"
+WATERLOGGING_MODEL_PATH = BASE_DIR / "output" / "waterlogging_rfdetr_s" / "checkpoint_best_total.pth"
 OUTPUTS_DIR = BASE_DIR / "outputs"
 FRONTEND_DIR = BASE_DIR / "frontend"
 
@@ -90,6 +95,27 @@ def load_model(model_name: str):
         _MODEL_CACHE["pothole"] = model
         return model
 
+    elif model_name == "incident":
+        print(f"[Sentrix API] Loading RF-DETR Incident / Accident Detection engine ({device})...")
+        model = RFDETRSmall(device=device)
+        _MODEL_CACHE["incident"] = model
+        return model
+
+    elif model_name == "waterlogging":
+        if not WATERLOGGING_MODEL_PATH.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Waterlogging model weights not found at {WATERLOGGING_MODEL_PATH}.",
+            )
+        print(f"[Sentrix API] Loading trained waterlogging model from {WATERLOGGING_MODEL_PATH} ({device})...")
+        model = RFDETRSmall(
+            pretrain_weights=str(WATERLOGGING_MODEL_PATH),
+            num_classes=1,
+            device=device,
+        )
+        _MODEL_CACHE["waterlogging"] = model
+        return model
+
     elif model_name == "coco":
         print(f"[Sentrix API] Loading base COCO RF-DETR model ({device})...")
         model = RFDETRSmall(device=device)
@@ -99,18 +125,77 @@ def load_model(model_name: str):
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown model_name '{model_name}'. Choose 'pothole' or 'coco'.",
+            detail=f"Unknown model_name '{model_name}'. Choose 'pothole', 'incident', 'waterlogging', or 'coco'.",
         )
+
+
+def convert_to_h264(video_path: Path) -> bool:
+    """Re-encode MP4 video to standard H.264 (avc1 / yuv420p) for native HTML5 browser playback."""
+    ffmpeg_exe = None
+    try:
+        import imageio_ffmpeg
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        import shutil
+        ffmpeg_exe = shutil.which("ffmpeg")
+
+    if not ffmpeg_exe or not os.path.exists(ffmpeg_exe):
+        print(f"[Sentrix API] Warning: ffmpeg not found for H.264 encoding.")
+        return False
+
+    temp_h264_path = video_path.parent / f"h264_{video_path.name}"
+    cmd = [
+        ffmpeg_exe,
+        "-y",
+        "-i", str(video_path),
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "fast",
+        "-crf", "23",
+        "-movflags", "+faststart",
+        str(temp_h264_path)
+    ]
+    try:
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0 and temp_h264_path.exists() and temp_h264_path.stat().st_size > 0:
+            temp_h264_path.replace(video_path)
+            print(f"[Sentrix API] Successfully re-encoded {video_path.name} to HTML5 H.264 format.")
+            return True
+        else:
+            print(f"[Sentrix API] ffmpeg error: {res.stderr}")
+            if temp_h264_path.exists():
+                temp_h264_path.unlink()
+            return False
+    except Exception as e:
+        print(f"[Sentrix API] H.264 conversion failed: {e}")
+        if temp_h264_path.exists():
+            temp_h264_path.unlink()
+        return False
 
 
 @app.get("/api/status")
 async def get_system_status():
     """System health check, available hardware, and model readiness."""
     device = get_device()
+
     pothole_ready = POTHOLE_MODEL_PATH.exists()
     pothole_size_mb = (
         round(POTHOLE_MODEL_PATH.stat().st_size / (1024 * 1024), 2)
         if pothole_ready
+        else 0
+    )
+
+    incident_ready = INCIDENT_MODEL_PATH.exists()
+    incident_size_mb = (
+        round(INCIDENT_MODEL_PATH.stat().st_size / (1024 * 1024), 2)
+        if incident_ready
+        else 0
+    )
+
+    waterlogging_ready = WATERLOGGING_MODEL_PATH.exists()
+    waterlogging_size_mb = (
+        round(WATERLOGGING_MODEL_PATH.stat().st_size / (1024 * 1024), 2)
+        if waterlogging_ready
         else 0
     )
 
@@ -125,10 +210,25 @@ async def get_system_status():
         "models": {
             "pothole": {
                 "available": pothole_ready,
-                "path": str(POTHOLE_MODEL_PATH.relative_to(BASE_DIR)),
+                "path": str(POTHOLE_MODEL_PATH.relative_to(BASE_DIR)) if pothole_ready else None,
                 "size_mb": pothole_size_mb,
                 "cached_in_memory": "pothole" in _MODEL_CACHE,
                 "classes": ["pothole"],
+            },
+            "incident": {
+                "available": incident_ready,
+                "path": str(INCIDENT_MODEL_PATH.relative_to(BASE_DIR)) if incident_ready else None,
+                "size_mb": incident_size_mb,
+                "cached_in_memory": "incident" in _MODEL_CACHE,
+                "classes": ["accident"],
+                "supports_tracking": True,
+            },
+            "waterlogging": {
+                "available": waterlogging_ready,
+                "path": str(WATERLOGGING_MODEL_PATH.relative_to(BASE_DIR)) if waterlogging_ready else None,
+                "size_mb": waterlogging_size_mb,
+                "cached_in_memory": "waterlogging" in _MODEL_CACHE,
+                "classes": ["waterlogging"],
             },
             "coco": {
                 "available": True,
@@ -228,8 +328,20 @@ async def detect_image(
 
         if model_name == "coco" and hasattr(detections, "data") and "class_name" in detections.data:
             class_name = detections.data["class_name"][i]
+            color = (59, 130, 246)
+        elif model_name == "incident":
+            raw_cname = detections.data["class_name"][i] if (hasattr(detections, "data") and "class_name" in detections.data) else "car"
+            if raw_cname.lower() in ["car", "bus", "truck", "motorcycle", "vehicle", "person"]:
+                class_name = f"accident ({raw_cname})"
+            else:
+                class_name = "accident"
+            color = (50, 50, 240)
+        elif model_name == "waterlogging":
+            class_name = "waterlogging"
+            color = (235, 180, 0)
         else:
             class_name = "pothole"
+            color = (0, 230, 118)
 
         detection_items.append({
             "id": i + 1,
@@ -242,7 +354,6 @@ async def detect_image(
         })
 
         # Draw bounding box & label
-        color = (0, 230, 118) if class_name == "pothole" else (59, 130, 246)
         cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 3)
 
         label = f"{class_name} {confidence:.2f}"
@@ -334,10 +445,12 @@ async def detect_video(
     temp_frame_path = OUTPUTS_DIR / "_temp" / f"frame_{timestamp}.jpg"
     temp_frame_path.parent.mkdir(parents=True, exist_ok=True)
 
+    tracker = IoUTracker(iou_threshold=0.25) if model_name == "incident" else None
     start_time = time.perf_counter()
     frame_number = 0
     processed_count = 0
     total_detections_in_video = 0
+    unique_tracks_count = 0
 
     try:
         while True:
@@ -356,19 +469,78 @@ async def detect_video(
 
             total_detections_in_video += len(detections.xyxy)
 
-            for box, confidence in zip(detections.xyxy, detections.confidence):
-                x1, y1, x2, y2 = map(int, box)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 230, 118), 2)
-                label = f"pothole {confidence:.2f}"
-                cv2.putText(
-                    frame,
-                    label,
-                    (x1, max(20, y1 - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0, 230, 118),
-                    2,
-                )
+            # Determine colors and class names
+            if model_name == "incident":
+                raw_dets = []
+                for idx, (box, conf) in enumerate(zip(detections.xyxy, detections.confidence)):
+                    x1, y1, x2, y2 = map(int, box)
+                    raw_cname = detections.data["class_name"][idx] if (hasattr(detections, "data") and "class_name" in detections.data) else "car"
+                    if raw_cname.lower() in ["car", "bus", "truck", "motorcycle", "vehicle", "person"]:
+                        cname = f"accident ({raw_cname})"
+                    else:
+                        cname = "accident"
+                    raw_dets.append({
+                        "box": [x1, y1, x2, y2],
+                        "confidence": float(conf),
+                        "class_name": cname,
+                    })
+
+                tracked_items = tracker.update(raw_dets) if tracker else raw_dets
+
+                for item in tracked_items:
+                    x1, y1, x2, y2 = item["box"]
+                    track_id = item.get("track_id", 1)
+                    unique_tracks_count = max(unique_tracks_count, track_id)
+
+                    color = (50, 50, 240)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
+
+                    # Draw motion trajectory trail
+                    history = item.get("history", [])
+                    for h_idx in range(1, len(history)):
+                        cv2.line(frame, history[h_idx - 1], history[h_idx], (0, 255, 255), 2)
+
+                    label = f"Incident #{track_id} {item['confidence']:.2f}"
+                    (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                    cv2.rectangle(frame, (x1, max(0, y1 - 25)), (x1 + w + 10, max(25, y1)), color, -1)
+                    cv2.putText(
+                        frame,
+                        label,
+                        (x1 + 5, max(18, y1 - 6)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (255, 255, 255),
+                        2,
+                    )
+            else:
+                if model_name == "waterlogging":
+                    default_label = "waterlogging"
+                    color = (235, 180, 0)
+                elif model_name == "coco":
+                    default_label = "object"
+                    color = (59, 130, 246)
+                else:
+                    default_label = "pothole"
+                    color = (0, 230, 118)
+
+                for idx, (box, confidence) in enumerate(zip(detections.xyxy, detections.confidence)):
+                    x1, y1, x2, y2 = map(int, box)
+                    if model_name == "coco" and hasattr(detections, "data") and "class_name" in detections.data:
+                        label_name = detections.data["class_name"][idx]
+                    else:
+                        label_name = default_label
+
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    label = f"{label_name} {confidence:.2f}"
+                    cv2.putText(
+                        frame,
+                        label,
+                        (x1, max(20, y1 - 8)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        color,
+                        2,
+                    )
 
             writer.write(frame)
             processed_count += 1
@@ -381,15 +553,21 @@ async def detect_video(
         if cleanup_input and video_input_path and video_input_path.exists():
             video_input_path.unlink()
 
+    # Convert to HTML5 compatible H.264 format
+    if output_filepath.exists():
+        convert_to_h264(output_filepath)
+
     total_time = round(time.perf_counter() - start_time, 2)
     avg_fps = round(processed_count / total_time, 1) if total_time > 0 else 0
 
     return {
         "success": True,
+        "model_used": model_name,
         "video_url": f"/outputs/video/{output_filename}",
         "frames_total": frame_number,
         "frames_detected": processed_count,
         "total_detections": total_detections_in_video,
+        "unique_tracks": unique_tracks_count if model_name == "incident" else 0,
         "processing_time_sec": total_time,
         "avg_fps": avg_fps,
         "width": width,
@@ -423,7 +601,7 @@ async def serve_index():
 
 def run_server(host: str = "127.0.0.1", port: int = 8000):
     import uvicorn
-    print(f"\n🚀 Sentrix AI Model Testing Platform running at: http://{host}:{port}")
+    print(f"\n[Sentrix AI] Testing Platform running at: http://{host}:{port}")
     uvicorn.run("ai.server:app", host=host, port=port, reload=False)
 
 

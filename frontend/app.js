@@ -101,6 +101,20 @@ document.addEventListener('DOMContentLoaded', () => {
         frameSkipVal.textContent = `Every ${e.target.value}${e.target.value === '1' ? 'st' : (e.target.value === '2' ? 'nd' : (e.target.value === '3' ? 'rd' : 'th'))}`;
     });
 
+    imageModelSelect.addEventListener('change', (e) => {
+        if (e.target.value === 'incident') {
+            imageThresholdSlider.value = 0.30;
+            imageThresholdVal.textContent = '0.30';
+        }
+    });
+
+    videoModelSelect.addEventListener('change', (e) => {
+        if (e.target.value === 'incident') {
+            videoThresholdSlider.value = 0.35;
+            videoThresholdVal.textContent = '0.35';
+        }
+    });
+
     // =========================================================================
     // 3. System Status & Sample Media Fetching
     // =========================================================================
@@ -116,11 +130,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Model Chip
             const potholeModel = data.models.pothole;
-            if (potholeModel && potholeModel.available) {
-                modelStatusText.textContent = `Pothole Model: Ready (${potholeModel.size_mb} MB)`;
+            const incidentModel = data.models.incident;
+            const waterloggingModel = data.models.waterlogging;
+
+            const readyModels = [];
+            if (potholeModel && potholeModel.available) readyModels.push('Potholes');
+            if (incidentModel && incidentModel.available) readyModels.push('Incidents');
+            if (waterloggingModel && waterloggingModel.available) readyModels.push('Waterlogging');
+
+            if (readyModels.length > 0) {
+                modelStatusText.textContent = `Models Ready: ${readyModels.join(', ')}`;
                 modelStatusChip.classList.add('chip-online');
             } else {
-                modelStatusText.textContent = 'Pothole Model: Checkpoint Missing';
+                modelStatusText.textContent = 'Models Missing Checkpoints';
                 modelStatusChip.style.borderColor = 'var(--accent-amber)';
                 modelStatusChip.style.color = 'var(--accent-amber)';
             }
@@ -425,12 +447,24 @@ document.addEventListener('DOMContentLoaded', () => {
         detectedVideoPlayer.classList.remove('hidden');
 
         // Append timestamp cache buster
-        detectedVideoPlayer.src = `${data.video_url}?t=${Date.now()}`;
+        const url = `${data.video_url}?t=${Date.now()}`;
+        if (detectedVideoSource) {
+            detectedVideoSource.src = url;
+        }
+        detectedVideoPlayer.src = url;
         detectedVideoPlayer.load();
-        detectedVideoPlayer.play().catch(() => {});
+        detectedVideoPlayer.play().catch(err => {
+            console.log('Autoplay deferred until user action:', err);
+        });
 
         videoFpsPill.textContent = `${data.avg_fps} FPS`;
-        videoDetectionsPill.textContent = `${data.total_detections} Potholes Found`;
+        if (data.model_used === 'incident') {
+            videoDetectionsPill.textContent = `${data.unique_tracks || data.total_detections} Incident(s) Tracked`;
+        } else if (data.model_used === 'waterlogging') {
+            videoDetectionsPill.textContent = `${data.total_detections} Flood Patch(es) Found`;
+        } else {
+            videoDetectionsPill.textContent = `${data.total_detections} Pothole(s) Found`;
+        }
     }
 
     // Init

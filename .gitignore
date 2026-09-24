@@ -1,9 +1,11 @@
 # Byte-compiled / optimized / DLL files
-__pycache__/
+
+**pycache**/
 *.py[cod]
 *$py.class
 
 # Model weights and checkpoints (exceed GitHub's 100MB file limit)
+
 *.ckpt
 *.pth
 *.pt
@@ -11,9 +13,23 @@ __pycache__/
 *.onnx
 
 # TensorBoard logs
+
 *.tfevents.*
 
+# Datasets
+
+datasets/incident/
+datasets/waterlogging/
+
+# Generated inference / video outputs
+
+outputs/video/*.mp4
+
+# Training metrics
+output/*/metrics.csv
+
 # Operating System files
+
 .DS_Store
 .DS_Store?
 ._*
@@ -23,12 +39,14 @@ ehthumbs.db
 Thumbs.db
 
 # Environments
+
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
 
 # IDE / Editor files
+
 .vscode/
 .idea/
