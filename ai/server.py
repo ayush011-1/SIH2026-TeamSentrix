@@ -96,8 +96,21 @@ def load_model(model_name: str):
         return model
 
     elif model_name == "incident":
-        print(f"[Sentrix API] Loading RF-DETR Incident / Accident Detection engine ({device})...")
-        model = RFDETRSmall(device=device)
+        if not INCIDENT_MODEL_PATH.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Incident model weights not found at {INCIDENT_MODEL_PATH}. "
+                    "Train the model using 'python ai/train.py --dataset-dir datasets/incident --output-dir output/incident_rfdetr_s' "
+                    "or download 'checkpoint_best_total.pth' into 'output/incident_rfdetr_s/'."
+                ),
+            )
+        print(f"[Sentrix API] Loading trained incident model from {INCIDENT_MODEL_PATH} ({device})...")
+        model = RFDETRSmall(
+            pretrain_weights=str(INCIDENT_MODEL_PATH),
+            num_classes=1,
+            device=device,
+        )
         _MODEL_CACHE["incident"] = model
         return model
 
@@ -330,11 +343,7 @@ async def detect_image(
             class_name = detections.data["class_name"][i]
             color = (59, 130, 246)
         elif model_name == "incident":
-            raw_cname = detections.data["class_name"][i] if (hasattr(detections, "data") and "class_name" in detections.data) else "car"
-            if raw_cname.lower() in ["car", "bus", "truck", "motorcycle", "vehicle", "person"]:
-                class_name = f"accident ({raw_cname})"
-            else:
-                class_name = "accident"
+            class_name = "accident"
             color = (50, 50, 240)
         elif model_name == "waterlogging":
             class_name = "waterlogging"
@@ -474,15 +483,10 @@ async def detect_video(
                 raw_dets = []
                 for idx, (box, conf) in enumerate(zip(detections.xyxy, detections.confidence)):
                     x1, y1, x2, y2 = map(int, box)
-                    raw_cname = detections.data["class_name"][idx] if (hasattr(detections, "data") and "class_name" in detections.data) else "car"
-                    if raw_cname.lower() in ["car", "bus", "truck", "motorcycle", "vehicle", "person"]:
-                        cname = f"accident ({raw_cname})"
-                    else:
-                        cname = "accident"
                     raw_dets.append({
                         "box": [x1, y1, x2, y2],
                         "confidence": float(conf),
-                        "class_name": cname,
+                        "class_name": "accident",
                     })
 
                 tracked_items = tracker.update(raw_dets) if tracker else raw_dets
