@@ -14,6 +14,10 @@ except ImportError:
     print("Error: 'rfdetr' package is not installed.", file=sys.stderr)
     sys.exit(1)
 
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 DEFAULT_MODEL_PATH = Path("output/waterlogging_rfdetr_s/checkpoint_best_total.pth")
 DEFAULT_VIDEO_PATH = Path("test_videos/road.mp4")
 DEFAULT_OUTPUT_PATH = Path("outputs/video/waterlogging_detected.mp4")

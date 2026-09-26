@@ -132,11 +132,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const potholeModel = data.models.pothole;
             const incidentModel = data.models.incident;
             const waterloggingModel = data.models.waterlogging;
+            const anprModel = data.models.anpr;
 
             const readyModels = [];
             if (potholeModel && potholeModel.available) readyModels.push('Potholes');
             if (incidentModel && incidentModel.available) readyModels.push('Incidents');
             if (waterloggingModel && waterloggingModel.available) readyModels.push('Waterlogging');
+            if (anprModel && anprModel.available) readyModels.push('ANPR');
 
             if (readyModels.length > 0) {
                 modelStatusText.textContent = `Models Ready: ${readyModels.join(', ')}`;
@@ -146,6 +148,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 modelStatusChip.style.borderColor = 'var(--accent-amber)';
                 modelStatusChip.style.color = 'var(--accent-amber)';
             }
+
+            // Sync Dropdown Options with Model Availability
+            function updateModelSelectOptions(selectElem) {
+                if (!selectElem) return;
+                const baseLabels = {
+                    pothole: 'Pothole Model (Trained RF-DETR-S)',
+                    incident: 'Incident/Accident Detection & Tracking',
+                    waterlogging: 'Waterlogging & Flood Patches',
+                    anpr: 'ANPR (License Plate) Model',
+                    coco: 'COCO General Model (80 Base Classes)',
+                };
+
+                Array.from(selectElem.options).forEach((opt) => {
+                    const key = opt.value;
+                    const baseText = baseLabels[key] || opt.textContent;
+                    if (key === 'coco') {
+                        opt.textContent = `${baseText} • Ready`;
+                        opt.disabled = false;
+                        return;
+                    }
+                    const modelInfo = data.models?.[key];
+                    if (modelInfo && modelInfo.available) {
+                        opt.textContent = `${baseText} • Ready`;
+                        opt.disabled = false;
+                    } else {
+                        opt.textContent = `${baseText} (Weights Missing)`;
+                        opt.disabled = true;
+                    }
+                });
+
+                // Auto-select first available option if current selection is missing weights
+                const currentOpt = selectElem.selectedOptions[0];
+                if (currentOpt && currentOpt.disabled) {
+                    const availableOpt = Array.from(selectElem.options).find((o) => !o.disabled);
+                    if (availableOpt) {
+                        selectElem.value = availableOpt.value;
+                        selectElem.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+
+            updateModelSelectOptions(imageModelSelect);
+            updateModelSelectOptions(videoModelSelect);
         } catch (err) {
             console.error('Failed to query status:', err);
             deviceText.textContent = 'Backend Offline';
@@ -216,6 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
             imageModelSelect.value = 'coco';
         } else if (sample.name.toLowerCase().includes('pothole')) {
             imageModelSelect.value = 'pothole';
+        } else if (sample.name.toLowerCase().includes('plate') || sample.name.toLowerCase().includes('car') || sample.name.toLowerCase().includes('anpr')) {
+            imageModelSelect.value = 'anpr';
         }
 
         imageSourcePreview.src = sample.url;
@@ -231,6 +278,21 @@ document.addEventListener('DOMContentLoaded', () => {
         state.currentVideoSamplePath = sample.path;
         sourceVideoPlayer.src = sample.url;
         sourceVideoPlayer.load();
+
+        const nameLower = (sample.name || '').toLowerCase();
+        if (nameLower.includes('incident') || nameLower.includes('accident')) {
+            videoModelSelect.value = 'incident';
+            videoModelSelect.dispatchEvent(new Event('change'));
+        } else if (nameLower.includes('water') || nameLower.includes('flood')) {
+            videoModelSelect.value = 'waterlogging';
+            videoModelSelect.dispatchEvent(new Event('change'));
+        } else if (nameLower.includes('plate') || nameLower.includes('anpr')) {
+            videoModelSelect.value = 'anpr';
+            videoModelSelect.dispatchEvent(new Event('change'));
+        } else if (nameLower.includes('road') || nameLower.includes('pothole')) {
+            videoModelSelect.value = 'pothole';
+            videoModelSelect.dispatchEvent(new Event('change'));
+        }
     }
 
     // =========================================================================
@@ -309,6 +371,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const modelName = imageModelSelect.value;
+        const modelInfo = state.modelStatus?.models?.[modelName];
+        if (modelInfo && !modelInfo.available) {
+            alert(`The selected model "${modelName}" weights are not installed yet.\nPlease train or add checkpoint_best_total.pth to output/${modelName}_rfdetr_s/ or choose an available model.`);
+            return;
+        }
+
         const threshold = parseFloat(imageThresholdSlider.value);
 
         const formData = new FormData();
@@ -408,6 +476,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const modelName = videoModelSelect.value;
+        const modelInfo = state.modelStatus?.models?.[modelName];
+        if (modelInfo && !modelInfo.available) {
+            alert(`The selected model "${modelName}" weights are not installed yet.\nPlease train or add checkpoint_best_total.pth to output/${modelName}_rfdetr_s/ or choose an available model.`);
+            return;
+        }
+
         const threshold = parseFloat(videoThresholdSlider.value);
         const frameSkip = parseInt(frameSkipSlider.value, 10);
 
@@ -462,6 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
             videoDetectionsPill.textContent = `${data.unique_tracks || data.total_detections} Incident(s) Tracked`;
         } else if (data.model_used === 'waterlogging') {
             videoDetectionsPill.textContent = `${data.total_detections} Flood Patch(es) Found`;
+        } else if (data.model_used === 'anpr') {
+            videoDetectionsPill.textContent = `${data.total_detections} Plate(s) Found`;
         } else {
             videoDetectionsPill.textContent = `${data.total_detections} Pothole(s) Found`;
         }

@@ -31,6 +31,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 POTHOLE_MODEL_PATH = BASE_DIR / "output" / "pothole_rfdetr_s" / "checkpoint_best_total.pth"
 INCIDENT_MODEL_PATH = BASE_DIR / "output" / "incident_rfdetr_s" / "checkpoint_best_total.pth"
 WATERLOGGING_MODEL_PATH = BASE_DIR / "output" / "waterlogging_rfdetr_s" / "checkpoint_best_total.pth"
+ANPR_MODEL_PATH = BASE_DIR / "output" / "anpr_rfdetr_s" / "checkpoint_best_total.pth"
 OUTPUTS_DIR = BASE_DIR / "outputs"
 FRONTEND_DIR = BASE_DIR / "frontend"
 
@@ -129,6 +130,21 @@ def load_model(model_name: str):
         _MODEL_CACHE["waterlogging"] = model
         return model
 
+    elif model_name == "anpr":
+        if not ANPR_MODEL_PATH.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"ANPR model weights not found at {ANPR_MODEL_PATH}.",
+            )
+        print(f"[Sentrix API] Loading trained ANPR model from {ANPR_MODEL_PATH} ({device})...")
+        model = RFDETRSmall(
+            pretrain_weights=str(ANPR_MODEL_PATH),
+            num_classes=1,
+            device=device,
+        )
+        _MODEL_CACHE["anpr"] = model
+        return model
+
     elif model_name == "coco":
         print(f"[Sentrix API] Loading base COCO RF-DETR model ({device})...")
         model = RFDETRSmall(device=device)
@@ -138,7 +154,7 @@ def load_model(model_name: str):
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown model_name '{model_name}'. Choose 'pothole', 'incident', 'waterlogging', or 'coco'.",
+            detail=f"Unknown model_name '{model_name}'. Choose 'pothole', 'incident', 'waterlogging', 'anpr', or 'coco'.",
         )
 
 
@@ -212,6 +228,13 @@ async def get_system_status():
         else 0
     )
 
+    anpr_ready = ANPR_MODEL_PATH.exists()
+    anpr_size_mb = (
+        round(ANPR_MODEL_PATH.stat().st_size / (1024 * 1024), 2)
+        if anpr_ready
+        else 0
+    )
+
     return {
         "status": "online",
         "device": device,
@@ -242,6 +265,13 @@ async def get_system_status():
                 "size_mb": waterlogging_size_mb,
                 "cached_in_memory": "waterlogging" in _MODEL_CACHE,
                 "classes": ["waterlogging"],
+            },
+            "anpr": {
+                "available": anpr_ready,
+                "path": str(ANPR_MODEL_PATH.relative_to(BASE_DIR)) if anpr_ready else None,
+                "size_mb": anpr_size_mb,
+                "cached_in_memory": "anpr" in _MODEL_CACHE,
+                "classes": ["license_plate"],
             },
             "coco": {
                 "available": True,
@@ -348,6 +378,9 @@ async def detect_image(
         elif model_name == "waterlogging":
             class_name = "waterlogging"
             color = (235, 180, 0)
+        elif model_name == "anpr":
+            class_name = "license_plate"
+            color = (200, 100, 255)
         else:
             class_name = "pothole"
             color = (0, 230, 118)
@@ -520,6 +553,9 @@ async def detect_video(
                 if model_name == "waterlogging":
                     default_label = "waterlogging"
                     color = (235, 180, 0)
+                elif model_name == "anpr":
+                    default_label = "license_plate"
+                    color = (200, 100, 255)
                 elif model_name == "coco":
                     default_label = "object"
                     color = (59, 130, 246)

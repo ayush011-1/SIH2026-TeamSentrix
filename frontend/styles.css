@@ -299,6 +299,16 @@ body {
     box-shadow: 0 0 0 2px var(--primary-emerald-glow);
 }
 
+.styled-select option {
+    background: #0f172a;
+    color: var(--text-primary);
+}
+
+.styled-select option:disabled {
+    color: rgba(148, 163, 184, 0.5);
+    background: #090d16;
+}
+
 .slider-group {
     flex-grow: 1;
     max-width: 320px;
