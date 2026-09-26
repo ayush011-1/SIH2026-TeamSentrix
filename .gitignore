@@ -8,6 +8,7 @@
 
 *.ckpt
 *.pth
+*.pth.bak
 *.pt
 *.bin
 *.onnx
