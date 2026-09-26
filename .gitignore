@@ -4,11 +4,10 @@
 *.py[cod]
 *$py.class
 
-# Model weights and checkpoints (exceed GitHub's 100MB file limit)
+# Model weights and checkpoints (tracked via Git LFS)
+# *.pth and *.pth.bak are handled by LFS — see .gitattributes
 
 *.ckpt
-*.pth
-*.pth.bak
 *.pt
 *.bin
 *.onnx
